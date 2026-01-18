@@ -112,19 +112,6 @@ body {
   align-items: center;
 }
 
-.github-link {
-  color: var(--muted);
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  margin-left: 4px;
-}
-
-.github-link:hover {
-  color: var(--text);
-  transform: scale(1.1);
-}
-
 .date {
   font-family: inherit;
   font-variant-numeric: tabular-nums;
