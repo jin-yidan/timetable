@@ -44,9 +44,10 @@ body {
 }
 
 .shell {
-  max-width: 640px;
-  margin: 80px auto;
-  padding: 0 24px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 24px;
 }
 
 /* Header & Nav */
@@ -57,14 +58,7 @@ body {
 .titleblock {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  width: 100%;
-}
-
-.header-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 16px;
   width: 100%;
 }
 
@@ -76,6 +70,7 @@ body {
 }
 
 .view-nav {
+  align-self: flex-start;
   display: inline-flex;
   background: var(--faint);
   padding: 4px;
@@ -110,6 +105,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
+  margin-top: 4px;
 }
 
 .date {
@@ -203,35 +199,16 @@ body {
 
 .addrow-row-2 {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding-left: 87px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
-.addrow-actions {
-  display: flex;
-  gap: 16px;
-}
-
-.time-chips {
-  display: flex;
-  gap: 8px;
-}
-
-.chip-sm {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.chip-sm:hover {
-  border-color: var(--muted);
-  color: var(--text);
+.addrow-row-2 .btn-primary-sm {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
 }
 
 .input-minimal {
@@ -303,7 +280,6 @@ body {
 }
 
 .note-field-wrap {
-  padding-left: 87px;
   margin-top: 4px;
 }
 

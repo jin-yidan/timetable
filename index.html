@@ -17,17 +17,15 @@
       <header class="topbar">
         <div class="titleblock">
           <h1 id="pageTitle" class="title">Today</h1>
-          <div class="header-controls">
-            <nav class="view-nav">
-              <button id="navTimeline" class="nav-btn active" type="button">Timeline</button>
-              <button id="navTasks" class="nav-btn" type="button">Upcoming</button>
-              <button id="navPlanner" class="nav-btn" type="button">Planner</button>
-            </nav>
-            <div class="topbar-actions" id="timelineActions">
-              <button id="prevDayBtn" class="btn-icon-sm" type="button" title="Previous Day">←</button>
-              <input id="dateInput" class="date" type="date" aria-label="Pick a day" />
-              <button id="nextDayBtn" class="btn-icon-sm" type="button" title="Next Day">→</button>
-            </div>
+          <nav class="view-nav">
+            <button id="navTimeline" class="nav-btn active" type="button">Timeline</button>
+            <button id="navTasks" class="nav-btn" type="button">Upcoming</button>
+            <button id="navPlanner" class="nav-btn" type="button">Planner</button>
+          </nav>
+          <div class="topbar-actions" id="timelineActions">
+            <button id="prevDayBtn" class="btn-icon-sm" type="button" title="Previous Day">←</button>
+            <input id="dateInput" class="date" type="date" aria-label="Pick a day" />
+            <button id="nextDayBtn" class="btn-icon-sm" type="button" title="Next Day">→</button>
           </div>
         </div>
       </header>
@@ -69,29 +67,12 @@
             <button id="importantToggle" class="icon-toggle" type="button" title="Flag event">
               <span class="icon">⚐</span>
             </button>
-
-            <button
-              id="addBtn"
-              class="btn-primary-sm"
-              type="submit"
-              disabled
-              title="Add event"
-            >
-              Add
-            </button>
           </div>
 
           <div class="addrow-row-2">
-            <div class="time-chips">
-              <button type="button" class="chip-sm" data-timechip="now">Now</button>
-              <button type="button" class="chip-sm" data-timechip="+30">+30m</button>
-              <button type="button" class="chip-sm" data-timechip="+60">+1h</button>
-            </div>
-            
-            <div class="addrow-actions">
-              <button id="toggleNoteBtn" class="btn-text-sm" type="button">Add note</button>
-              <button id="cancelAddBtn" class="btn-text-sm" type="button">Cancel</button>
-            </div>
+            <button id="addBtn" class="btn-primary-sm" type="submit" disabled title="Add event">Add</button>
+            <button id="toggleNoteBtn" class="btn-text-sm" type="button">Add note</button>
+            <button id="cancelAddBtn" class="btn-text-sm" type="button">Cancel</button>
           </div>
 
           <div id="noteWrap" class="note-field-wrap" hidden>

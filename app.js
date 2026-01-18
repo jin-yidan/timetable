@@ -192,12 +192,10 @@ function init() {
   els.deleteEditBtn.addEventListener("click", () => {
     const id = els.editDialog.dataset.editingId;
     if (!id) return;
-    if (confirm("Delete this event?")) {
-      events = events.filter(e => e.id !== id);
-      persist();
-      render();
-      els.editDialog.close();
-    }
+    events = events.filter(e => e.id !== id);
+    persist();
+    render();
+    els.editDialog.close();
   });
   
   els.editForm.addEventListener("submit", (e) => {
@@ -214,17 +212,22 @@ function init() {
     }
   });
 
-  // Time chips
-  document.querySelectorAll("[data-timechip]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const chip = btn.getAttribute("data-timechip");
-      const next = timeFromChip(chip);
-      if (next) {
-        els.timeInput.value = next;
-        els.timeInput.focus();
+  // Auto-Today Refresh logic
+  setInterval(() => {
+    const now = new Date();
+    const todayStr = localDateKey(now);
+    // If the date has changed and we were viewing the "previous" today
+    if (selectedDate !== todayStr && currentView === "timeline") {
+      // Check if the page title was "Today"
+      const wasToday = els.pageTitle.textContent === "Today";
+      if (wasToday) {
+        selectedDate = todayStr;
+        els.dateInput.value = selectedDate;
+        localStorage.setItem(SELECTED_DATE_KEY, selectedDate);
+        render();
       }
-    });
-  });
+    }
+  }, 60000); // Check every minute
 
   render();
 }
@@ -532,11 +535,9 @@ function createEventNode(item) {
       deleteBtn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (confirm("Delete this event?")) {
-          events = events.filter(e => e.id !== item.id);
-          persist();
-          render();
-        }
+        events = events.filter(e => e.id !== item.id);
+        persist();
+        render();
         menu.remove();
         li.style.zIndex = "";
       };
@@ -694,12 +695,4 @@ function stableSort(arr, cmp) {
   return arr.map((item, idx) => ({ item, idx }))
     .sort((a, b) => cmp(a.item, b.item) || a.idx - b.idx)
     .map(x => x.item);
-}
-function timeFromChip(chip) {
-  const base = new Date();
-  if (chip === "now") return toTimeInputValue(roundTo5Minutes(base));
-  const m = chip.match(/^[+](\d+)$/);
-  if (!m) return null;
-  base.setMinutes(base.getMinutes() + parseInt(m[1]));
-  return toTimeInputValue(roundTo5Minutes(base));
 }
