@@ -3,6 +3,7 @@
   "short_name": "Timetable",
   "description": "A minimalist, aesthetic timeline widget for your daily productivity.",
   "start_url": "./index.html",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#050505",

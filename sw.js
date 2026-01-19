@@ -1,10 +1,10 @@
-const CACHE_NAME = 'timetable-v1';
+const CACHE_NAME = 'timetable-v1.1';
 const ASSETS = [
   './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.json'
+  'index.html',
+  'styles.css',
+  'app.js',
+  'manifest.json'
 ];
 
 // Install Service Worker
