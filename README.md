@@ -9,7 +9,7 @@ This application is a Progressive Web App (PWA) designed to provide a streamline
 ## Core Features
 
 ### Daily Timeline
-- **Flexible Time Entry**: Supports various input formats including natural language shortcuts like "now", "+30m", or "+1h", as well as standard 24-hour time.
+- **Flexible Time Entry**: Supports standard 24-hour time formats.
 - **Event Organization**: Create events with optional notes and importance flags.
 - **Progress Tracking**: Real-time visual feedback via a progress bar based on completed tasks.
 - **Auto-complete Suggestions**: Learns from previous entries to expedite the addition of recurring events.

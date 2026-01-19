@@ -652,18 +652,6 @@ function timeToMinutes(t) {
 
 function parseTimeFlexible(raw) {
   const s = raw.trim().toLowerCase();
-  if (s === "now") return toTimeInputValue(new Date());
-
-  // Handle relative time like "+15", "+1h", "in 20"
-  const relMatch = s.match(/^(?:\+|\bin\s+)(\d+)(m|h)?$/);
-  if (relMatch) {
-    const amount = parseInt(relMatch[1]);
-    const unit = relMatch[2] || "m";
-    const dt = new Date();
-    if (unit === "h") dt.setHours(dt.getHours() + amount);
-    else dt.setMinutes(dt.getMinutes() + amount);
-    return toTimeInputValue(dt);
-  }
 
   let h, m;
   const m1 = s.match(/^(\d{1,2}):(\d{2})$/);
