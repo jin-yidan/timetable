@@ -292,7 +292,12 @@ function init() {
     if (item) {
       item.date = els.editDateInput.value || item.date;
       item.time = parseTimeFlexible(els.editTimeInput.value) || item.time;
-      item.endTime = els.editEndTimeInput?.value ? parseTimeFlexible(els.editEndTimeInput.value) : item.endTime;
+      if (els.editEndTimeInput?.value === "") {
+        item.endTime = null;
+      } else if (els.editEndTimeInput?.value) {
+        const parsed = parseTimeFlexible(els.editEndTimeInput.value);
+        if (parsed !== null) item.endTime = parsed;
+      }
       item.title = els.editTitleInput.value.trim();
       item.note = els.editNoteInput.value.trim();
       item.modifiedAt = Date.now();
@@ -441,7 +446,7 @@ function renderTimeline() {
     if (els.timeBlockContainer) els.timeBlockContainer.hidden = true;
 
     for (const item of sorted) {
-      els.timeline.appendChild(createEventNode(item, null, item.isImported));
+      els.timeline.appendChild(createEventNode(item, item._instanceDate || null, item.isImported));
     }
   } else {
     // Block view
@@ -941,11 +946,15 @@ function isEventDone(event, date) {
 }
 
 function toggleEventDone(event, date) {
-  if (!event.recurrence || event.recurrence.type === "none") {
-    event.done = !event.done;
-    event.modifiedAt = Date.now();
+  // Find the actual event in the array by ID (not the copy used for rendering)
+  const actualEvent = events.find(e => e.id === event.id);
+  if (!actualEvent) return;
+
+  if (!actualEvent.recurrence || actualEvent.recurrence.type === "none") {
+    actualEvent.done = !actualEvent.done;
+    actualEvent.modifiedAt = Date.now();
   } else {
-    const key = getRecurrenceDoneKey(event.id, date);
+    const key = getRecurrenceDoneKey(actualEvent.id, date);
     recurrenceDoneMap[key] = !recurrenceDoneMap[key];
     persistRecurrenceDone();
   }
