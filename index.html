@@ -19,9 +19,19 @@
     <main class="shell" aria-label="Timetable widget">
       <header class="topbar">
         <div class="titleblock">
-          <h1 id="pageTitle" class="title">Today</h1>
+          <div class="title-row">
+            <h1 id="pageTitle" class="title">Today</h1>
+            <button id="settingsBtn" class="btn-icon-sm settings-btn" type="button" title="Settings">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="dateInfoLabel" class="date-info-label"></div>
           <nav class="view-nav">
             <button id="navTimeline" class="nav-btn active" type="button">Timeline</button>
+            <button id="navWeek" class="nav-btn" type="button">Week</button>
             <button id="navTasks" class="nav-btn" type="button">Upcoming</button>
             <button id="navPlanner" class="nav-btn" type="button">Planner</button>
           </nav>
@@ -36,7 +46,10 @@
       <section class="card" id="timelineView" aria-label="Timeline View">
         <div class="card-header">
           <span id="countHint" class="count-label">0 EVENTS</span>
-          <button id="showAddBtn" class="btn-primary-sm" type="button">Add event</button>
+          <div class="header-actions">
+            <button id="viewToggle" class="btn-icon-sm" type="button" title="Toggle view">☰</button>
+            <button id="showAddBtn" class="btn-primary-sm" type="button">Add event</button>
+          </div>
         </div>
 
         <div class="progress-bar-wrap" id="progressBarWrap" hidden>
@@ -51,41 +64,58 @@
               type="text"
               inputmode="numeric"
               placeholder="09:00"
-              aria-label="Time"
+              aria-label="Start time"
               required
             />
-            
+            <span class="time-separator">-</span>
+            <input
+              id="endTimeInput"
+              class="input-minimal time-field"
+              type="text"
+              inputmode="numeric"
+              placeholder="10:00"
+              aria-label="End time"
+            />
+
             <input
               id="titleInput"
               class="input-minimal event-field"
               type="text"
-              placeholder="What are you doing?"
+              placeholder="Event title..."
               aria-label="Event"
               required
               maxlength="80"
               list="eventSuggestions"
             />
             <datalist id="eventSuggestions"></datalist>
+          </div>
 
+          <div id="nlpPreview" class="nlp-preview" hidden></div>
+
+          <div class="addrow-row-2">
+            <button id="toggleNoteBtn" class="btn-text-sm" type="button">Note</button>
+            <input
+              id="noteInput"
+              class="input-minimal note-field-inline"
+              type="text"
+              placeholder="Add a note..."
+              maxlength="140"
+            />
+          </div>
+
+          <div class="addrow-row-3">
+            <select id="recurrenceSelect" class="input-minimal select-sm">
+              <option value="none">No repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
             <button id="importantToggle" class="icon-toggle" type="button" title="Flag event">
               <span class="icon">⚐</span>
             </button>
-          </div>
-
-          <div class="addrow-row-2">
-            <button id="addBtn" class="btn-primary-sm" type="submit" disabled title="Add event">Add</button>
-            <button id="toggleNoteBtn" class="btn-text-sm" type="button">Add note</button>
+            <div class="addrow-spacer"></div>
             <button id="cancelAddBtn" class="btn-text-sm" type="button">Cancel</button>
-          </div>
-
-          <div id="noteWrap" class="note-field-wrap" hidden>
-            <input
-              id="noteInput"
-              class="input-minimal note-field"
-              type="text"
-              placeholder="Add a footnote..."
-              maxlength="140"
-            />
+            <button id="addBtn" class="btn-primary-sm" type="submit" disabled title="Add event">Add</button>
           </div>
         </form>
 
@@ -93,11 +123,27 @@
 
         <div class="timeline-container">
           <ol id="timeline" class="timeline-list"></ol>
-          
+          <div id="timeBlockContainer" class="time-block-container" hidden></div>
+
           <div id="emptyState" class="empty-view" hidden>
             <p id="emptyTitle">No events</p>
           </div>
         </div>
+      </section>
+
+      <!-- Week View -->
+      <section class="card" id="weekView" aria-label="Week View" hidden>
+        <div class="card-header">
+          <span class="count-label">WEEK VIEW</span>
+          <div id="weekActions" class="week-actions">
+            <button id="prevWeekBtn" class="btn-icon-sm" type="button" title="Previous Week">←</button>
+            <span id="weekLabel" class="week-label">Jan 20 - Jan 26</span>
+            <button id="nextWeekBtn" class="btn-icon-sm" type="button" title="Next Week">→</button>
+            <button id="todayWeekBtn" class="btn-text-sm" type="button">Today</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div id="weekGrid" class="week-grid"></div>
       </section>
 
       <!-- Tasks View (Upcoming) -->
@@ -165,9 +211,20 @@
         </header>
         <div class="modal-body">
           <div class="edit-grid">
-            <input class="input-minimal" id="editTimeInput" type="text" placeholder="Time" required />
+            <input class="input-minimal" id="editDateInput" type="date" required />
+            <div class="edit-time-row">
+              <input class="input-minimal" id="editTimeInput" type="text" placeholder="Start" required />
+              <span class="time-separator">-</span>
+              <input class="input-minimal" id="editEndTimeInput" type="text" placeholder="End" />
+            </div>
             <input class="input-minimal" id="editTitleInput" type="text" placeholder="Event" required />
             <input class="input-minimal" id="editNoteInput" type="text" placeholder="Note" />
+            <select id="editRecurrenceSelect" class="input-minimal">
+              <option value="none">No repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </div>
         </div>
         <footer class="modal-footer">
@@ -178,27 +235,46 @@
       </form>
     </dialog>
 
+    <dialog id="settingsDialog" class="modal">
+      <form id="settingsForm" class="modal-content" method="dialog">
+        <header class="modal-header">
+          <h2 class="modal-title">Settings</h2>
+        </header>
+        <div class="modal-body">
+          <div class="settings-group">
+            <label class="settings-label" for="calendarUrlInput">School Calendar URL (iCal)</label>
+            <input class="input-minimal" id="calendarUrlInput" type="url" placeholder="https://..." />
+            <p class="settings-hint">Enter your school's iCal calendar URL for auto-sync</p>
+          </div>
+          <div class="settings-status" id="syncStatus"></div>
+        </div>
+        <footer class="modal-footer">
+          <button class="btn-text-sm" type="button" id="closeSettingsBtn">Cancel</button>
+          <button class="btn-primary-sm" type="submit">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
     <template id="eventTemplate">
       <li class="timeline-item" data-id="">
-        <div class="item-left">
-          <div class="item-time" data-role="when"></div>
-          <button class="check-circle" data-action="toggleDone" type="button" aria-label="Mark done"></button>
-        </div>
-        
+        <div class="item-time" data-role="when"></div>
+
         <div class="item-center">
-          <div class="item-title" data-role="what"></div>
+          <div class="item-title-row">
+            <div class="item-title" data-role="what"></div>
+            <div class="item-indicators" data-role="indicators"></div>
+          </div>
           <div class="item-note" data-role="note"></div>
         </div>
 
         <div class="item-right">
-          <button class="icon-btn star-btn" data-action="toggleImportant" type="button" title="Flagged">
-            <span class="icon" data-role="flag">⚐</span>
-          </button>
+          <button class="check-circle" data-action="toggleDone" type="button" aria-label="Mark done"></button>
           <button class="icon-btn" data-action="edit" title="More actions">⋯</button>
         </div>
       </li>
     </template>
 
+    <script src="./holidays.js"></script>
     <script src="./app.js" defer></script>
     <script>
       if ('serviceWorker' in navigator) {
