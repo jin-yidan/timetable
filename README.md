@@ -1,49 +1,69 @@
-# Timetable Widget
+# Timetable
 
-A minimalist, offline-first productivity application for managing daily schedules, upcoming tasks, and monthly goals.
+A simple timetable app for managing daily events. Works as a web app or a macOS desktop widget.
 
-## Overview
+## What it does
 
-This application is a Progressive Web App (PWA) designed to provide a streamlined interface for personal organization. It runs entirely in the browser and stores data locally, ensuring privacy and offline availability.
+- **Timeline view**: See your events for any day in a list or as time blocks on a 24-hour grid
+- **Week view**: See a whole week at a glance with events shown as blocks
+- **Upcoming view**: See all your unfinished tasks grouped by date
+- **Monthly planner**: Set goals for each month of the year
+- **Chinese holidays**: Automatically shows Chinese public holidays and 24 solar terms (二十四节气)
+- **School calendar sync**: Import events from an iCal URL (like university timetables)
 
-## Core Features
+## How to use
 
-### Daily Timeline
-- **Flexible Time Entry**: Supports standard 24-hour time formats.
-- **Event Organization**: Create events with optional notes and importance flags.
-- **Progress Tracking**: Real-time visual feedback via a progress bar based on completed tasks.
-- **Auto-complete Suggestions**: Learns from previous entries to expedite the addition of recurring events.
+### Adding events
+1. Click "Add event"
+2. Enter start time and end time (optional)
+3. Type the event title
+4. Click "Note" if you want to add a note
+5. Choose repeat option if it's recurring (daily, weekly, monthly)
+6. Click the flag icon if it's important
+7. Click "Add"
 
-### Task Management
-- **Upcoming View**: A consolidated list of all unfinished tasks across future dates, grouped chronologically.
-- **Task Status**: Quickly toggle completion status directly from the timeline.
+### Checking off events
+Click the circle next to an event to mark it done.
 
-### Monthly Planner
-- **Long-term Goals**: A dedicated view for setting and tracking objectives for each month of the year.
-- **Persistence**: Goals are saved independently and can be managed through a simplified edit mode.
+### Editing or deleting events
+Click the three dots (⋯) on an event, then choose Edit or Delete.
 
-## Technical Specifications
+### Switching views
+Use the tabs at the top: Timeline, Week, Upcoming, Planner.
 
-- **Offline Support**: Utilizes Service Workers to cache assets, allowing the app to function without an internet connection.
-- **PWA Ready**: Can be installed as a standalone application on mobile devices and desktops.
-- **Local Storage**: All data remains on the user's device via the Web Storage API.
-- **Typography**: Optimized for readability using the Plus Jakarta Sans typeface.
+### Navigating dates
+- Use the arrow buttons to go to previous/next day or week
+- Click the date picker to jump to any date
 
-## Installation and Usage
+### Importing school calendar
+1. Click the settings icon (gear) in the top right
+2. Paste your iCal calendar URL
+3. Click Save
+4. Events will sync automatically and appear in blue
 
-### Accessing the App
-The application is hosted via GitHub Pages and can be accessed at:
-https://jin-yidan.github.io/timetable/
+### macOS desktop widget
+The `xcode` folder contains a macOS app that displays this timetable as a floating widget. To use it:
+1. Open `xcode/Timetable.xcodeproj` in Xcode
+2. Update the file path in `ContentView.swift` to point to your local `index.html`
+3. Build and run
 
-### Installing as an App
-1. **iOS (Safari)**: Tap the Share icon and select "Add to Home Screen".
-2. **Android (Chrome)**: Tap the menu icon (three dots) and select "Install app".
-3. **Desktop (Chrome/Edge)**: Click the installation icon in the address bar.
+The widget can be resized, moved around, and made fullscreen. Right-click for options.
 
-### Local Execution
-To run the project locally without hosting:
-1. Clone the repository to your machine.
-2. Open `index.html` in a modern web browser.
+## Running locally
+
+### Web version
+Just open `index.html` in a browser. Works offline after first load.
+
+### As a PWA
+Visit https://jin-yidan.github.io/timetable/ and install it:
+- iOS: Share → Add to Home Screen
+- Android: Menu → Install app
+- Desktop: Click install icon in address bar
+
+## Data storage
+
+Everything is stored in your browser's localStorage. Nothing is sent to any server. If you clear browser data, your events will be deleted.
 
 ## License
-MIT License.
+
+MIT
