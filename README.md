@@ -2,6 +2,16 @@
 
 A simple timetable app for managing daily events. Works as a web app or a macOS desktop widget.
 
+## Download
+
+[Download the latest release](../../releases/latest)
+
+### Installation
+
+1. Download `Reader.zip`
+2. Unzip and run the app
+3. **First launch:** System Settings → Privacy & Security → Click "Open Anyway"
+
 ## What it does
 
 - **Timeline view**: See your events for any day in a list or as time blocks on a 24-hour grid
