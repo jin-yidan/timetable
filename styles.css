@@ -102,6 +102,16 @@ body {
   display: block;
 }
 
+.date-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.date-subtitle:empty {
+  display: none;
+}
+
 .date-info-label {
   font-size: 13px;
   color: var(--danger);

@@ -75,8 +75,8 @@ struct ContentView: View {
 
             window.setIsVisible(true)
 
-            // Enable fullscreen and allow joining all spaces
-            window.collectionBehavior = [.fullScreenPrimary, .canJoinAllSpaces]
+            // Enable fullscreen, stay on current space only
+            window.collectionBehavior = [.fullScreenPrimary, .moveToActiveSpace]
             window.backgroundColor = .clear
             window.isMovableByWindowBackground = true
 

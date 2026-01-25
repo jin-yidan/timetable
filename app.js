@@ -57,6 +57,7 @@ const els = {
   prevDayBtn: /** @type {HTMLButtonElement} */ (document.getElementById("prevDayBtn")),
   nextDayBtn: /** @type {HTMLButtonElement} */ (document.getElementById("nextDayBtn")),
   pageTitle: /** @type {HTMLHeadingElement} */ (document.getElementById("pageTitle")),
+  dateSubtitle: /** @type {HTMLDivElement} */ (document.getElementById("dateSubtitle")),
   viewToggle: /** @type {HTMLButtonElement} */ (document.getElementById("viewToggle")),
 
   // Modal
@@ -419,10 +420,13 @@ function switchView(view) {
   // Update page title
   if (view === "week") {
     els.pageTitle.textContent = "Week";
+    els.dateSubtitle.textContent = "";
   } else if (view === "tasks") {
     els.pageTitle.textContent = "Upcoming";
+    els.dateSubtitle.textContent = "";
   } else if (view === "planner") {
     els.pageTitle.textContent = "Planner";
+    els.dateSubtitle.textContent = "";
   }
 
   render();
@@ -844,16 +848,17 @@ function shiftDate(days) {
 function syncTitle() {
   const dt = new Date(`${selectedDate}T00:00:00`);
   const today = localDateKey(new Date());
+  const weekday = dt.toLocaleDateString(undefined, { weekday: "long" });
+  const month = dt.toLocaleDateString(undefined, { month: "short" });
+  const day = dt.getDate();
+  const year = dt.getFullYear();
 
   if (selectedDate === today) {
     els.pageTitle.textContent = "Today";
   } else {
-    els.pageTitle.textContent = dt.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    });
+    els.pageTitle.textContent = weekday;
   }
+  els.dateSubtitle.textContent = `${year}/${month}/${day}`;
 
   // Update holiday/solar term label
   updateDateInfoLabel(selectedDate);
