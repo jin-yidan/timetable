@@ -40,8 +40,7 @@ class WidgetController: NSObject, NSWindowDelegate {
 }
 
 struct ContentView: View {
-    // Make sure this path is correct for your Mac
-    let localPath = URL(fileURLWithPath: "/Users/jinyidan/Desktop/projects/timetable/index.html")
+    let localPath: URL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "WebResources")!
     let controller = WidgetController()
 
     var body: some View {

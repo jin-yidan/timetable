@@ -11,6 +11,7 @@
 		A33333333333333333333333 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44444444444444444444444 /* ContentView.swift */; };
 		A55555555555555555555555 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A66666666666666666666666 /* Assets.xcassets */; };
 		DE9A3D1C2F225C0F001A27FA /* CalendarSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9A3D1B2F225C0F001A27FA /* CalendarSyncManager.swift */; };
+		WEBRES000000000000000001 /* WebResources in Resources */ = {isa = PBXBuildFile; fileRef = WEBRES000000000000000002 /* WebResources */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +20,7 @@
 		A44444444444444444444444 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A66666666666666666666666 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DE9A3D1B2F225C0F001A27FA /* CalendarSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSyncManager.swift; sourceTree = "<group>"; };
+		WEBRES000000000000000002 /* WebResources */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebResources; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,6 +49,7 @@
 				A44444444444444444444444 /* ContentView.swift */,
 				DE9A3D1B2F225C0F001A27FA /* CalendarSyncManager.swift */,
 				A66666666666666666666666 /* Assets.xcassets */,
+				WEBRES000000000000000002 /* WebResources */,
 			);
 			path = Timetable;
 			sourceTree = "<group>";
@@ -118,6 +121,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A55555555555555555555555 /* Assets.xcassets in Resources */,
+				WEBRES000000000000000001 /* WebResources in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
