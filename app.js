@@ -360,6 +360,7 @@ function expandAdd() {
   els.addFormDivider.hidden = false;
   els.showAddBtn.hidden = true;
   els.timeInput.value = formatTime(toTimeInputValue(roundTo5Minutes(new Date())));
+  els.endTimeInput.value = "";
   els.noteInput.disabled = true;
   els.noteInput.value = "";
   els.toggleNoteBtn.textContent = "Note";
@@ -379,6 +380,8 @@ function collapseAdd() {
   addRowImportant = false;
   els.importantToggle.classList.remove("active");
   els.importantToggle.querySelector(".icon").textContent = "⚐";
+  if (els.recurrenceSelect) els.recurrenceSelect.value = "none";
+  els.endTimeInput.value = "";
   syncAddEnabled();
 }
 
