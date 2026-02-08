@@ -172,21 +172,48 @@ class CalendarSyncManager: NSObject, WKScriptMessageHandler {
 
     private func parseDTValue(_ value: String) -> (date: String, time: String) {
         // Handle formats: 20260122T100000Z, 20260122T100000, 20260122
+        let isUTC = value.hasSuffix("Z")
         let cleanValue = value.replacingOccurrences(of: "Z", with: "")
 
         if cleanValue.contains("T") {
-            let parts = cleanValue.split(separator: "T")
+            let parts = cleanValue.split(separator: "T", maxSplits: 1)
             let datePart = String(parts[0])
             let timePart = parts.count > 1 ? String(parts[1]) : "000000"
 
-            let year = String(datePart.prefix(4))
-            let month = String(datePart.dropFirst(4).prefix(2))
-            let day = String(datePart.dropFirst(6).prefix(2))
+            let year = Int(datePart.prefix(4)) ?? 0
+            let month = Int(datePart.dropFirst(4).prefix(2)) ?? 1
+            let day = Int(datePart.dropFirst(6).prefix(2)) ?? 1
 
-            let hour = String(timePart.prefix(2))
-            let minute = String(timePart.dropFirst(2).prefix(2))
+            let hour = Int(timePart.prefix(2)) ?? 0
+            let minute = Int(timePart.dropFirst(2).prefix(2)) ?? 0
+            let second = timePart.count >= 6 ? (Int(timePart.dropFirst(4).prefix(2)) ?? 0) : 0
 
-            return (date: "\(year)-\(month)-\(day)", time: "\(hour):\(minute)")
+            var comps = DateComponents()
+            comps.year = year
+            comps.month = month
+            comps.day = day
+            comps.hour = hour
+            comps.minute = minute
+            comps.second = second
+            comps.timeZone = isUTC ? TimeZone(secondsFromGMT: 0) : TimeZone.current
+
+            let calendar = Calendar(identifier: .gregorian)
+            if let date = calendar.date(from: comps) {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone.current
+
+                formatter.dateFormat = "yyyy-MM-dd"
+                let dateStr = formatter.string(from: date)
+                formatter.dateFormat = "HH:mm"
+                let timeStr = formatter.string(from: date)
+
+                return (date: dateStr, time: timeStr)
+            }
+
+            let dateStr = String(format: "%04d-%02d-%02d", year, month, day)
+            let timeStr = String(format: "%02d:%02d", hour, minute)
+            return (date: dateStr, time: timeStr)
         } else {
             // All-day event
             let year = String(cleanValue.prefix(4))

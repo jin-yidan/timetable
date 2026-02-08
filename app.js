@@ -263,7 +263,7 @@ function init() {
       createdAt: Date.now(),
       modifiedAt: Date.now(),
       endTime: parsed.endTime || endTime,
-      sortOrder: events.length,
+      sortOrder: hasManualOrder(eventDate) ? getNextSortOrder(eventDate) : null,
       recurrence: recurrenceType !== "none" ? { type: recurrenceType, interval: 1 } : null,
     };
 
@@ -291,6 +291,7 @@ function init() {
 
     const item = events.find(e => e.id === id);
     if (item) {
+      const prevDate = item.date;
       item.date = els.editDateInput.value || item.date;
       item.time = parseTimeFlexible(els.editTimeInput.value) || item.time;
       if (els.editEndTimeInput?.value === "") {
@@ -305,6 +306,9 @@ function init() {
 
       const recurrence = els.editRecurrenceSelect?.value || "none";
       item.recurrence = recurrence !== "none" ? { type: recurrence, interval: 1 } : null;
+      if (item.date !== prevDate) {
+        item.sortOrder = hasManualOrder(item.date) ? getNextSortOrder(item.date) : null;
+      }
 
       persist();
       render();
@@ -484,26 +488,41 @@ function renderTimeline() {
 }
 
 function renderTasks() {
-  // Only show manual unfinished events (no imported events)
-  const unfinished = events.filter(e => !e.done);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = localDateKey(today);
+  const UPCOMING_DAYS = 365;
 
-  // Filter to only future/today events
-  const today = localDateKey(new Date());
-  const futureTasks = unfinished.filter(e => e.date >= today);
+  /** @type {{ event: EventItem, date: string }[]} */
+  const upcoming = [];
+  for (let i = 0; i <= UPCOMING_DAYS; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const dateStr = localDateKey(d);
+    const dayEvents = getEventsForDate(dateStr);
+    for (const event of dayEvents) {
+      if (!isEventDone(event, dateStr)) {
+        upcoming.push({ event, date: dateStr });
+      }
+    }
+  }
+
+  // Filter to only future/today events (safety)
+  const futureTasks = upcoming.filter(t => t.date >= todayStr);
 
   els.unfinishedCount.textContent = `${futureTasks.length} upcoming tasks`;
 
   // Sort by date then by time
   futureTasks.sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return compareEvent(a, b);
+    return compareEvent(a.event, b.event);
   });
 
   // Group by date
   const groups = new Map();
   for (const item of futureTasks) {
     if (!groups.has(item.date)) groups.set(item.date, []);
-    groups.get(item.date).push(item);
+    groups.get(item.date).push(item.event);
   }
 
   els.unfinishedList.innerHTML = "";
@@ -644,11 +663,13 @@ function createEventNode(item, instanceDate = null, isImported = false) {
   const frag = els.tmpl.content.cloneNode(true);
   const li = frag.querySelector(".timeline-item");
   const displayDate = instanceDate || item.date;
+  const isRecurring = !!(item.recurrence && item.recurrence.type !== "none");
+  const isReorderable = !isImported && !isRecurring;
   li.dataset.id = item.id;
   li.dataset.instanceDate = displayDate;
   li.dataset.important = String(item.important);
   li.dataset.done = String(isImported ? false : isEventDone(item, displayDate));
-  li.draggable = !isImported;
+  li.draggable = isReorderable;
   if (isImported) li.classList.add("imported");
 
   const when = li.querySelector('[data-role="when"]');
@@ -682,8 +703,8 @@ function createEventNode(item, instanceDate = null, isImported = false) {
   note.textContent = item.note || "";
   note.hidden = !item.note;
 
-  // Drag & Drop handlers (only for non-imported events)
-  if (!isImported) {
+  // Drag & Drop handlers (only for non-imported, non-recurring events)
+  if (isReorderable) {
     li.addEventListener("dragstart", (e) => {
       draggedItem = { item, instanceDate: displayDate };
       li.classList.add("dragging");
@@ -881,10 +902,19 @@ function updateSuggestions() {
   });
 }
 
-function compareEvent(a, b) {
+function compareEventBase(a, b) {
   const am = timeToMinutes(a.time), bm = timeToMinutes(b.time);
   if (am !== bm) return am - bm;
   return a.createdAt - b.createdAt;
+}
+
+function compareEvent(a, b) {
+  const aOrder = a.sortOrder;
+  const bOrder = b.sortOrder;
+  if (aOrder != null && bOrder != null && aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+  return compareEventBase(a, b);
 }
 
 function timeToMinutes(t) {
@@ -1234,6 +1264,7 @@ function renderWeekView() {
       dayCol.classList.remove("drag-over");
       if (draggedItem) {
         draggedItem.item.date = dateStr;
+        draggedItem.item.sortOrder = hasManualOrder(dateStr) ? getNextSortOrder(dateStr) : null;
         draggedItem.item.modifiedAt = Date.now();
         persist();
         render();
@@ -1275,7 +1306,8 @@ function createWeekEventBlock(event, dateStr, isImported = false) {
   block.className = "week-event-block";
   if (isImported) block.classList.add("imported");
   block.dataset.id = event.id;
-  block.draggable = !isImported;
+  const isRecurring = !!(event.recurrence && event.recurrence.type !== "none");
+  block.draggable = !isImported && !isRecurring;
 
   const HOUR_HEIGHT = 60;
   const startMinutes = timeToMinutes(event.time);
@@ -1307,17 +1339,19 @@ function createWeekEventBlock(event, dateStr, isImported = false) {
       openEditDialog(event);
     });
 
-    block.addEventListener("dragstart", (e) => {
-      draggedItem = { item: event, instanceDate: dateStr };
-      block.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", event.id);
-    });
+    if (!isRecurring) {
+      block.addEventListener("dragstart", (e) => {
+        draggedItem = { item: event, instanceDate: dateStr };
+        block.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", event.id);
+      });
 
-    block.addEventListener("dragend", () => {
-      block.classList.remove("dragging");
-      draggedItem = null;
-    });
+      block.addEventListener("dragend", () => {
+        block.classList.remove("dragging");
+        draggedItem = null;
+      });
+    }
   }
 
   return block;
@@ -1359,7 +1393,10 @@ function parseNaturalLanguageData(text) {
       result.hasAny = true;
       let hour = parseInt(match[1]);
       let minute = match[2] ? parseInt(match[2]) : 0;
-      const ampm = match[3]?.toLowerCase();
+      let ampm = match[3]?.toLowerCase();
+      let endAmpm = match[6]?.toLowerCase();
+      if (!ampm && endAmpm) ampm = endAmpm;
+      if (!endAmpm && ampm) endAmpm = ampm;
 
       if (ampm === "pm" && hour < 12) hour += 12;
       if (ampm === "am" && hour === 12) hour = 0;
@@ -1371,7 +1408,6 @@ function parseNaturalLanguageData(text) {
       if (match[4]) {
         let endHour = parseInt(match[4]);
         let endMinute = match[5] ? parseInt(match[5]) : 0;
-        const endAmpm = match[6]?.toLowerCase();
 
         if (endAmpm === "pm" && endHour < 12) endHour += 12;
         if (endAmpm === "am" && endHour === 12) endHour = 0;
@@ -1384,14 +1420,16 @@ function parseNaturalLanguageData(text) {
 
   // Parse date: "today", "tomorrow", "next Monday", "Jan 25"
   const today = new Date();
-  const todayStr = localDateKey(today);
+  const todayDate = new Date(today);
+  todayDate.setHours(0, 0, 0, 0);
+  const todayStr = localDateKey(todayDate);
 
   if (/\btoday\b/i.test(lowerText)) {
     result.date = todayStr;
     result.hasAny = true;
     result.cleanTitle = result.cleanTitle.replace(/\btoday\b/i, "").trim();
   } else if (/\btomorrow\b/i.test(lowerText)) {
-    const tomorrow = new Date(today);
+    const tomorrow = new Date(todayDate);
     tomorrow.setDate(tomorrow.getDate() + 1);
     result.date = localDateKey(tomorrow);
     result.hasAny = true;
@@ -1407,7 +1445,7 @@ function parseNaturalLanguageData(text) {
       if (daysUntil <= 0) daysUntil += 7;
       daysUntil += 7; // "next" means next week
 
-      const targetDate = new Date(today);
+      const targetDate = new Date(todayDate);
       targetDate.setDate(targetDate.getDate() + daysUntil);
       result.date = localDateKey(targetDate);
       result.hasAny = true;
@@ -1424,9 +1462,9 @@ function parseNaturalLanguageData(text) {
       };
       const month = months[monthMatch[1].toLowerCase()];
       const day = parseInt(monthMatch[2]);
-      const year = today.getFullYear();
+      const year = todayDate.getFullYear();
       const targetDate = new Date(year, month, day);
-      if (targetDate < today) targetDate.setFullYear(year + 1);
+      if (targetDate < todayDate) targetDate.setFullYear(year + 1);
       result.date = localDateKey(targetDate);
       result.hasAny = true;
       result.cleanTitle = result.cleanTitle.replace(monthMatch[0], "").trim();
@@ -1469,26 +1507,41 @@ function formatDateForDisplay(dateStr) {
 
 function reorderEvents(draggedId, targetId, date) {
   const dayEvents = events.filter(e => e.date === date);
-  const draggedIdx = dayEvents.findIndex(e => e.id === draggedId);
-  const targetIdx = dayEvents.findIndex(e => e.id === targetId);
+  const ordered = dayEvents.slice().sort((a, b) => {
+    const aOrder = a.sortOrder;
+    const bOrder = b.sortOrder;
+    if (aOrder != null && bOrder != null && aOrder !== bOrder) return aOrder - bOrder;
+    return compareEventBase(a, b);
+  });
+  const draggedIdx = ordered.findIndex(e => e.id === draggedId);
+  const targetIdx = ordered.findIndex(e => e.id === targetId);
 
   if (draggedIdx === -1 || targetIdx === -1) return;
 
-  // Update sort orders
-  const draggedEvent = events.find(e => e.id === draggedId);
-  const targetEvent = events.find(e => e.id === targetId);
+  const [moved] = ordered.splice(draggedIdx, 1);
+  ordered.splice(targetIdx, 0, moved);
 
-  if (!draggedEvent || !targetEvent) return;
-
-  // Swap sort orders or recalculate
-  const temp = draggedEvent.sortOrder;
-  draggedEvent.sortOrder = targetEvent.sortOrder;
-  targetEvent.sortOrder = temp;
-  draggedEvent.modifiedAt = Date.now();
-  targetEvent.modifiedAt = Date.now();
+  const now = Date.now();
+  for (let i = 0; i < ordered.length; i++) {
+    ordered[i].sortOrder = i;
+    ordered[i].modifiedAt = now;
+  }
 
   persist();
   render();
+}
+
+function hasManualOrder(dateStr) {
+  return events.some(e => e.date === dateStr && typeof e.sortOrder === "number");
+}
+
+function getNextSortOrder(dateStr) {
+  let max = -1;
+  for (const e of events) {
+    if (e.date !== dateStr) continue;
+    if (typeof e.sortOrder === "number" && e.sortOrder > max) max = e.sortOrder;
+  }
+  return max + 1;
 }
 
 // ===== IMPORTED EVENTS =====
@@ -1585,4 +1638,3 @@ function getWeekDayInfo(dateStr) {
   }
   return html;
 }
-
