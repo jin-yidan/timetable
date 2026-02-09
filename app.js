@@ -21,7 +21,6 @@ const IMPORTED_EVENTS_KEY = "timetable.importedEvents.v1";
  *   done: boolean;
  *   createdAt: number;
  *   endTime?: string;
- *   sortOrder?: number;
  *   modifiedAt?: number;
  *   recurrence?: { type: "none" | "daily" | "weekly" | "monthly"; interval: number; endDate?: string; daysOfWeek?: number[] } | null;
  * }} EventItem
@@ -135,7 +134,8 @@ let plannerEditMode = false;
 let selectedDate = loadSelectedDate();
 let weekStartDate = loadWeekStart();
 let addRowImportant = false;
-let draggedItem = null;
+/** @type {AbortController|null} */
+let popoverAbort = null;
 let calendarUrl = localStorage.getItem(CALENDAR_URL_KEY) || "";
 
 // Defer initialization to avoid choppiness
@@ -263,7 +263,6 @@ function init() {
       createdAt: Date.now(),
       modifiedAt: Date.now(),
       endTime: parsed.endTime || endTime,
-      sortOrder: hasManualOrder(eventDate) ? getNextSortOrder(eventDate) : null,
       recurrence: recurrenceType !== "none" ? { type: recurrenceType, interval: 1 } : null,
     };
 
@@ -291,7 +290,6 @@ function init() {
 
     const item = events.find(e => e.id === id);
     if (item) {
-      const prevDate = item.date;
       item.date = els.editDateInput.value || item.date;
       item.time = parseTimeFlexible(els.editTimeInput.value) || item.time;
       if (els.editEndTimeInput?.value === "") {
@@ -306,9 +304,6 @@ function init() {
 
       const recurrence = els.editRecurrenceSelect?.value || "none";
       item.recurrence = recurrence !== "none" ? { type: recurrence, interval: 1 } : null;
-      if (item.date !== prevDate) {
-        item.sortOrder = hasManualOrder(item.date) ? getNextSortOrder(item.date) : null;
-      }
 
       persist();
       render();
@@ -390,6 +385,8 @@ function collapseAdd() {
 }
 
 function render() {
+  // Clean up any orphaned popover listeners before re-rendering
+  if (popoverAbort) { popoverAbort.abort(); popoverAbort = null; }
   if (currentView === "timeline") {
     renderTimeline();
   } else if (currentView === "week") {
@@ -447,7 +444,7 @@ function renderTimeline() {
     ...dayEvents.map(e => ({ ...e, isImported: false })),
     ...dayImported.map(e => ({ ...e, isImported: true }))
   ];
-  const sorted = stableSort(allEvents.slice(), compareEvent);
+  const sorted = stableSort(allEvents.slice(), compareEventBase);
 
   els.timeline.innerHTML = "";
   if (els.timeBlockContainer) els.timeBlockContainer.innerHTML = "";
@@ -515,7 +512,7 @@ function renderTasks() {
   // Sort by date then by time
   futureTasks.sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return compareEvent(a.event, b.event);
+    return compareEventBase(a.event, b.event);
   });
 
   // Group by date
@@ -649,7 +646,7 @@ function renderPlannerEditList() {
 }
 
 function persistMonthly() {
-  localStorage.setItem(MONTHLY_KEY, JSON.stringify(monthlyGoals));
+  safeSave(MONTHLY_KEY, monthlyGoals);
 }
 
 function loadMonthlyGoals() {
@@ -663,13 +660,10 @@ function createEventNode(item, instanceDate = null, isImported = false) {
   const frag = els.tmpl.content.cloneNode(true);
   const li = frag.querySelector(".timeline-item");
   const displayDate = instanceDate || item.date;
-  const isRecurring = !!(item.recurrence && item.recurrence.type !== "none");
-  const isReorderable = !isImported && !isRecurring;
   li.dataset.id = item.id;
   li.dataset.instanceDate = displayDate;
   li.dataset.important = String(item.important);
   li.dataset.done = String(isImported ? false : isEventDone(item, displayDate));
-  li.draggable = isReorderable;
   if (isImported) li.classList.add("imported");
 
   const when = li.querySelector('[data-role="when"]');
@@ -703,41 +697,6 @@ function createEventNode(item, instanceDate = null, isImported = false) {
   note.textContent = item.note || "";
   note.hidden = !item.note;
 
-  // Drag & Drop handlers (only for non-imported, non-recurring events)
-  if (isReorderable) {
-    li.addEventListener("dragstart", (e) => {
-      draggedItem = { item, instanceDate: displayDate };
-      li.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", item.id);
-    });
-
-    li.addEventListener("dragend", () => {
-      li.classList.remove("dragging");
-      draggedItem = null;
-      document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
-    });
-
-    li.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      if (draggedItem && draggedItem.item.id !== item.id) {
-        li.classList.add("drag-over");
-      }
-    });
-
-    li.addEventListener("dragleave", () => {
-      li.classList.remove("drag-over");
-    });
-
-    li.addEventListener("drop", (e) => {
-      e.preventDefault();
-      li.classList.remove("drag-over");
-      if (draggedItem && draggedItem.item.id !== item.id) {
-        reorderEvents(draggedItem.item.id, item.id, displayDate);
-      }
-    });
-  }
-
   li.addEventListener("click", (e) => {
     if (isImported) return; // Don't handle clicks for imported events
     const target = e.target;
@@ -749,7 +708,8 @@ function createEventNode(item, instanceDate = null, isImported = false) {
       persist();
       render();
     } else if (action === "edit") {
-      // Close any existing menus first
+      // Close any existing menus and abort their listeners
+      if (popoverAbort) { popoverAbort.abort(); popoverAbort = null; }
       document.querySelectorAll(".popover-menu").forEach(m => m.remove());
       document.querySelectorAll(".timeline-item").forEach(item => item.style.zIndex = "");
 
@@ -790,19 +750,19 @@ function createEventNode(item, instanceDate = null, isImported = false) {
 
       li.appendChild(menu);
 
+      popoverAbort = new AbortController();
       setTimeout(() => {
-        const closer = (e) => {
+        document.addEventListener("click", (e) => {
           if (!menu.parentElement) {
-            document.removeEventListener("click", closer);
+            popoverAbort?.abort(); popoverAbort = null;
             return;
           }
           if (!menu.contains(e.target)) {
             menu.remove();
             li.style.zIndex = "";
-            document.removeEventListener("click", closer);
+            popoverAbort?.abort(); popoverAbort = null;
           }
-        };
-        document.addEventListener("click", closer);
+        }, { signal: popoverAbort.signal });
       }, 0);
     }
   });
@@ -824,8 +784,18 @@ function openEditDialog(item) {
 }
 
 // Helpers
+function safeSave(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      alert("Storage is full. Some changes may not be saved. Try deleting old events.");
+    }
+  }
+}
+
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  safeSave(STORAGE_KEY, events);
 }
 function loadEvents() {
   try {
@@ -846,7 +816,6 @@ function normalizeEvent(x) {
     createdAt: x.createdAt || Date.now(),
     modifiedAt: x.modifiedAt || Date.now(),
     endTime: x.endTime || null,
-    sortOrder: x.sortOrder ?? null,
     recurrence: x.recurrence || null,
   };
 }
@@ -908,15 +877,6 @@ function compareEventBase(a, b) {
   return a.createdAt - b.createdAt;
 }
 
-function compareEvent(a, b) {
-  const aOrder = a.sortOrder;
-  const bOrder = b.sortOrder;
-  if (aOrder != null && bOrder != null && aOrder !== bOrder) {
-    return aOrder - bOrder;
-  }
-  return compareEventBase(a, b);
-}
-
 function timeToMinutes(t) {
   const m = t.match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return 0;
@@ -968,7 +928,7 @@ function loadRecurrenceDone() {
 }
 
 function persistRecurrenceDone() {
-  localStorage.setItem(RECURRENCE_DONE_KEY, JSON.stringify(recurrenceDoneMap));
+  safeSave(RECURRENCE_DONE_KEY, recurrenceDoneMap);
 }
 
 function getRecurrenceDoneKey(eventId, date) {
@@ -1251,26 +1211,6 @@ function renderWeekView() {
       dayCol.appendChild(eventEl);
     }
 
-    // Drop zone for drag and drop
-    dayCol.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      dayCol.classList.add("drag-over");
-    });
-    dayCol.addEventListener("dragleave", () => {
-      dayCol.classList.remove("drag-over");
-    });
-    dayCol.addEventListener("drop", (e) => {
-      e.preventDefault();
-      dayCol.classList.remove("drag-over");
-      if (draggedItem) {
-        draggedItem.item.date = dateStr;
-        draggedItem.item.sortOrder = hasManualOrder(dateStr) ? getNextSortOrder(dateStr) : null;
-        draggedItem.item.modifiedAt = Date.now();
-        persist();
-        render();
-      }
-    });
-
     gridBody.appendChild(dayCol);
   }
 
@@ -1306,8 +1246,6 @@ function createWeekEventBlock(event, dateStr, isImported = false) {
   block.className = "week-event-block";
   if (isImported) block.classList.add("imported");
   block.dataset.id = event.id;
-  const isRecurring = !!(event.recurrence && event.recurrence.type !== "none");
-  block.draggable = !isImported && !isRecurring;
 
   const HOUR_HEIGHT = 60;
   const startMinutes = timeToMinutes(event.time);
@@ -1339,19 +1277,6 @@ function createWeekEventBlock(event, dateStr, isImported = false) {
       openEditDialog(event);
     });
 
-    if (!isRecurring) {
-      block.addEventListener("dragstart", (e) => {
-        draggedItem = { item: event, instanceDate: dateStr };
-        block.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", event.id);
-      });
-
-      block.addEventListener("dragend", () => {
-        block.classList.remove("dragging");
-        draggedItem = null;
-      });
-    }
   }
 
   return block;
@@ -1496,52 +1421,12 @@ function formatDateForDisplay(dateStr) {
   const dt = new Date(`${dateStr}T00:00:00`);
   const today = localDateKey(new Date());
   const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   if (dateStr === today) return "Today";
   if (dateStr === localDateKey(tomorrow)) return "Tomorrow";
   return dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-// ===== DRAG & DROP =====
-
-function reorderEvents(draggedId, targetId, date) {
-  const dayEvents = events.filter(e => e.date === date);
-  const ordered = dayEvents.slice().sort((a, b) => {
-    const aOrder = a.sortOrder;
-    const bOrder = b.sortOrder;
-    if (aOrder != null && bOrder != null && aOrder !== bOrder) return aOrder - bOrder;
-    return compareEventBase(a, b);
-  });
-  const draggedIdx = ordered.findIndex(e => e.id === draggedId);
-  const targetIdx = ordered.findIndex(e => e.id === targetId);
-
-  if (draggedIdx === -1 || targetIdx === -1) return;
-
-  const [moved] = ordered.splice(draggedIdx, 1);
-  ordered.splice(targetIdx, 0, moved);
-
-  const now = Date.now();
-  for (let i = 0; i < ordered.length; i++) {
-    ordered[i].sortOrder = i;
-    ordered[i].modifiedAt = now;
-  }
-
-  persist();
-  render();
-}
-
-function hasManualOrder(dateStr) {
-  return events.some(e => e.date === dateStr && typeof e.sortOrder === "number");
-}
-
-function getNextSortOrder(dateStr) {
-  let max = -1;
-  for (const e of events) {
-    if (e.date !== dateStr) continue;
-    if (typeof e.sortOrder === "number" && e.sortOrder > max) max = e.sortOrder;
-  }
-  return max + 1;
 }
 
 // ===== IMPORTED EVENTS =====
