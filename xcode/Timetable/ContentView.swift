@@ -9,8 +9,10 @@ import WebKit
 
 class WebViewCoordinator {
     let calendarSyncManager = CalendarSyncManager()
+    let cloudSyncManager = CloudSyncManager()
 }
 
+#if os(macOS)
 struct WebView: NSViewRepresentable {
     let url: URL
     let coordinator = WebViewCoordinator()
@@ -19,14 +21,14 @@ struct WebView: NSViewRepresentable {
         let config = WKWebViewConfiguration()
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 
-        // Add calendar sync message handler
         config.userContentController.add(coordinator.calendarSyncManager, name: "calendarSync")
+        config.userContentController.add(coordinator.cloudSyncManager, name: "cloudSync")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
 
-        // Set webView reference for callback
         coordinator.calendarSyncManager.webView = webView
+        coordinator.cloudSyncManager.webView = webView
 
         return webView
     }
@@ -56,7 +58,6 @@ struct ContentView: View {
     }
 
     func configureWidget() {
-        // Close any extra windows, keep only one
         let windows = NSApplication.shared.windows
         if windows.count > 1 {
             for i in 1..<windows.count {
@@ -67,19 +68,16 @@ struct ContentView: View {
         if let window = NSApplication.shared.windows.first {
             window.delegate = controller
 
-            // Allow dragging, resizing, and fullscreen
             window.styleMask = [.titled, .resizable, .fullSizeContentView, .miniaturizable, .closable]
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
 
             window.setIsVisible(true)
 
-            // Enable fullscreen, stay on current space only
             window.collectionBehavior = [.fullScreenPrimary, .moveToActiveSpace]
             window.backgroundColor = .clear
             window.isMovableByWindowBackground = true
 
-            // Right-click menu
             let menu = NSMenu()
             menu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
             menu.addItem(NSMenuItem(title: "Exit Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f"))
@@ -91,3 +89,43 @@ struct ContentView: View {
         }
     }
 }
+
+#else // iOS
+
+struct WebView: UIViewRepresentable {
+    let url: URL
+    let coordinator = WebViewCoordinator()
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+
+        config.userContentController.add(coordinator.calendarSyncManager, name: "calendarSync")
+        config.userContentController.add(coordinator.cloudSyncManager, name: "cloudSync")
+
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+
+        coordinator.calendarSyncManager.webView = webView
+        coordinator.cloudSyncManager.webView = webView
+
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        uiView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+    }
+}
+
+struct ContentView: View {
+    let localPath: URL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "WebResources")!
+
+    var body: some View {
+        WebView(url: localPath)
+            .ignoresSafeArea()
+    }
+}
+
+#endif

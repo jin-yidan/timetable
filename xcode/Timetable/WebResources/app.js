@@ -280,6 +280,7 @@ function init() {
     if (!id) return;
     events = events.filter(e => e.id !== id);
     persist();
+    cloudDeleteEvent(id);
     render();
     els.editDialog.close();
   });
@@ -349,6 +350,15 @@ function init() {
   // Request calendar sync from Swift on load
   if (calendarUrl && window.webkit?.messageHandlers?.calendarSync) {
     window.webkit.messageHandlers.calendarSync.postMessage({ action: "sync", url: calendarUrl });
+  }
+
+  // CloudKit: initial sync — pull remote changes then push all local data
+  if (window.webkit?.messageHandlers?.cloudSync) {
+    window.webkit.messageHandlers.cloudSync.postMessage({ action: "requestSync" });
+    cloudPushEvents();
+    cloudPushGoals();
+    cloudPushRecurrenceDone();
+    cloudPushSettings();
   }
 
   render();
@@ -635,8 +645,10 @@ function renderPlannerEditList() {
     `;
     
     itemEl.querySelector("button").addEventListener("click", () => {
-      monthlyGoals = monthlyGoals.filter(g => g.id !== item.id);
+      const deletedId = item.id;
+      monthlyGoals = monthlyGoals.filter(g => g.id !== deletedId);
       persistMonthly();
+      cloudDeleteGoal(deletedId);
       renderPlannerEditList();
       render();
     });
@@ -647,6 +659,7 @@ function renderPlannerEditList() {
 
 function persistMonthly() {
   safeSave(MONTHLY_KEY, monthlyGoals);
+  cloudPushGoals();
 }
 
 function loadMonthlyGoals() {
@@ -738,8 +751,10 @@ function createEventNode(item, instanceDate = null, isImported = false) {
       deleteBtn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        events = events.filter(e => e.id !== item.id);
+        const deletedId = item.id;
+        events = events.filter(e => e.id !== deletedId);
         persist();
+        cloudDeleteEvent(deletedId);
         render();
         menu.remove();
         li.style.zIndex = "";
@@ -796,6 +811,7 @@ function safeSave(key, data) {
 
 function persist() {
   safeSave(STORAGE_KEY, events);
+  cloudPushEvents();
 }
 function loadEvents() {
   try {
@@ -929,6 +945,7 @@ function loadRecurrenceDone() {
 
 function persistRecurrenceDone() {
   safeSave(RECURRENCE_DONE_KEY, recurrenceDoneMap);
+  cloudPushRecurrenceDone();
 }
 
 function getRecurrenceDoneKey(eventId, date) {
@@ -1459,6 +1476,7 @@ function saveSettings(e) {
   if (newUrl !== calendarUrl) {
     calendarUrl = newUrl;
     localStorage.setItem(CALENDAR_URL_KEY, calendarUrl);
+    cloudPushSettings();
 
     if (calendarUrl && window.webkit?.messageHandlers?.calendarSync) {
       updateSyncStatus("syncing", "Syncing calendar...");
@@ -1523,3 +1541,98 @@ function getWeekDayInfo(dateStr) {
   }
   return html;
 }
+
+// ===== CLOUDKIT SYNC BRIDGE =====
+
+function cloudPushEvents() {
+  if (!window.webkit?.messageHandlers?.cloudSync) return;
+  window.webkit.messageHandlers.cloudSync.postMessage({ action: "pushEvents", events: events });
+}
+
+function cloudPushGoals() {
+  if (!window.webkit?.messageHandlers?.cloudSync) return;
+  window.webkit.messageHandlers.cloudSync.postMessage({ action: "pushGoals", goals: monthlyGoals });
+}
+
+function cloudPushRecurrenceDone() {
+  if (!window.webkit?.messageHandlers?.cloudSync) return;
+  window.webkit.messageHandlers.cloudSync.postMessage({ action: "pushRecurrenceDone", map: recurrenceDoneMap });
+}
+
+function cloudPushSettings() {
+  if (!window.webkit?.messageHandlers?.cloudSync) return;
+  window.webkit.messageHandlers.cloudSync.postMessage({ action: "pushSettings", key: "calendarUrl", value: calendarUrl || "" });
+}
+
+function cloudDeleteEvent(id) {
+  if (!window.webkit?.messageHandlers?.cloudSync) return;
+  window.webkit.messageHandlers.cloudSync.postMessage({ action: "deleteEvent", id: id });
+}
+
+function cloudDeleteGoal(id) {
+  if (!window.webkit?.messageHandlers?.cloudSync) return;
+  window.webkit.messageHandlers.cloudSync.postMessage({ action: "deleteGoal", id: id });
+}
+
+window.receiveCloudChanges = function(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr);
+
+    // Merge events (last-write-wins by modifiedAt)
+    if (data.events && data.events.length > 0) {
+      for (const remote of data.events) {
+        if (remote.deleted) {
+          events = events.filter(e => e.id !== remote.id);
+          continue;
+        }
+        const idx = events.findIndex(e => e.id === remote.id);
+        if (idx >= 0) {
+          const local = events[idx];
+          if ((remote.modifiedAt || 0) >= (local.modifiedAt || 0)) {
+            events[idx] = normalizeEvent(remote);
+          }
+        } else {
+          events.push(normalizeEvent(remote));
+        }
+      }
+      safeSave(STORAGE_KEY, events);
+    }
+
+    // Merge goals
+    if (data.goals && data.goals.length > 0) {
+      for (const remote of data.goals) {
+        if (remote.deleted) {
+          monthlyGoals = monthlyGoals.filter(g => g.id !== remote.id);
+          continue;
+        }
+        const idx = monthlyGoals.findIndex(g => g.id === remote.id);
+        if (idx >= 0) {
+          monthlyGoals[idx] = remote;
+        } else {
+          monthlyGoals.push(remote);
+        }
+      }
+      safeSave(MONTHLY_KEY, monthlyGoals);
+    }
+
+    // Merge recurrence done map
+    if (data.recurrenceDone && Object.keys(data.recurrenceDone).length > 0) {
+      for (const [key, value] of Object.entries(data.recurrenceDone)) {
+        recurrenceDoneMap[key] = value;
+      }
+      safeSave(RECURRENCE_DONE_KEY, recurrenceDoneMap);
+    }
+
+    // Merge settings
+    if (data.settings) {
+      if (data.settings.calendarUrl !== undefined) {
+        calendarUrl = data.settings.calendarUrl;
+        localStorage.setItem(CALENDAR_URL_KEY, calendarUrl);
+      }
+    }
+
+    render();
+  } catch (e) {
+    console.error("Failed to process cloud changes:", e);
+  }
+};

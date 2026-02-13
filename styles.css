@@ -61,7 +61,7 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)) 20px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
