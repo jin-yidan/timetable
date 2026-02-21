@@ -10,6 +10,11 @@
   --radius: 12px;
   --event-bg: #fef3c7;
   --event-text: #92400e;
+  --imported-bg: rgba(59, 130, 246, 0.15);
+  --imported-text: #93c5fd;
+  --imported-hover: rgba(59, 130, 246, 0.25);
+  --imported-border: #3b82f6;
+  --today-highlight: rgba(255, 255, 255, 0.03);
 }
 
 @media (prefers-color-scheme: light) {
@@ -24,6 +29,11 @@
     --danger: #d00000;
     --event-bg: #fef9c3;
     --event-text: #713f12;
+    --imported-bg: #dbeafe;
+    --imported-text: #1e40af;
+    --imported-hover: #bfdbfe;
+    --imported-border: #3b82f6;
+    --today-highlight: rgba(0, 0, 0, 0.03);
   }
 }
 
@@ -593,20 +603,35 @@ body {
   padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.task-item:hover {
+  background: var(--faint);
 }
 
 .task-item:last-child {
   border-bottom: none;
 }
 
-.task-bullet {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--muted);
+.task-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 40px;
   flex-shrink: 0;
+}
+
+.task-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Planner View */
@@ -754,6 +779,7 @@ body {
   margin: auto;
   box-shadow: 0 20px 40px rgba(0,0,0,0.4);
   outline: none;
+  z-index: 1001;
 }
 
 .modal::backdrop {
@@ -879,38 +905,38 @@ body {
 
 /* Imported events */
 .week-event-block.imported {
-  background: #dbeafe;
-  color: #1e40af;
-  border-left-color: #3b82f6;
+  background: var(--imported-bg);
+  color: var(--imported-text);
+  border-left-color: var(--imported-border);
 }
 
 .week-event-block.imported:hover {
-  background: #bfdbfe;
+  background: var(--imported-hover);
 }
 
 .time-block.imported {
-  background: #dbeafe;
-  color: #1e40af;
-  border-left: 3px solid #3b82f6;
+  background: var(--imported-bg);
+  color: var(--imported-text);
+  border-left: 3px solid var(--imported-border);
 }
 
 .time-block.imported:hover {
-  background: #bfdbfe;
+  background: var(--imported-hover);
 }
 
 .timeline-item.imported {
-  background: #dbeafe;
-  color: #1e40af;
-  border-left: 3px solid #3b82f6;
+  background: var(--imported-bg);
+  color: var(--imported-text);
+  border-left: 3px solid var(--imported-border);
 }
 
 .timeline-item.imported .item-time,
 .timeline-item.imported .item-title {
-  color: #1e40af;
+  color: var(--imported-text);
 }
 
 .timeline-item.imported .item-note {
-  color: #3b82f6;
+  color: var(--imported-border);
 }
 
 .timeline-item.imported .check-circle,
@@ -1200,7 +1226,7 @@ body {
 }
 
 .week-day-header.today {
-  background: rgba(255,255,255,0.03);
+  background: var(--today-highlight);
 }
 
 .day-name {
@@ -1293,7 +1319,7 @@ body {
 }
 
 .week-day-col.today {
-  background: rgba(255,255,255,0.025);
+  background: var(--today-highlight);
 }
 
 .week-hour-slot {
@@ -1329,8 +1355,8 @@ body {
 }
 
 .week-event-block.important {
-  background: #fecaca;
-  color: #991b1b;
+  background: var(--danger);
+  color: #fff;
   border-left-color: var(--danger);
 }
 
@@ -1357,6 +1383,10 @@ body {
 
 /* Responsive adjustments */
 @media (max-width: 600px) {
+  .week-header-row {
+    grid-template-columns: 40px repeat(7, 1fr);
+  }
+
   .week-grid-body {
     grid-template-columns: 40px repeat(7, 1fr);
   }
@@ -1380,4 +1410,30 @@ body {
   .day-number {
     font-size: 14px;
   }
+}
+
+/* Focus-visible states for keyboard navigation */
+.nav-btn:focus-visible,
+.btn-icon-sm:focus-visible,
+.btn-text-sm:focus-visible,
+.btn-primary-sm:focus-visible,
+.btn-text:focus-visible,
+.icon-btn:focus-visible,
+.icon-toggle:focus-visible,
+.check-circle:focus-visible,
+.popover-item:focus-visible,
+.date:focus-visible,
+.input-minimal:focus-visible,
+.select-sm:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* iOS momentum scrolling */
+.timeline-container,
+.time-block-container,
+.week-grid-body,
+.planner-edit-list,
+.tasks-container {
+  -webkit-overflow-scrolling: touch;
 }

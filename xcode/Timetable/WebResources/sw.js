@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timetable-v1.4';
+const CACHE_NAME = 'timetable-v1.5';
 const ASSETS = [
   './',
   'index.html',
@@ -30,12 +30,27 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch Assets from Cache (Offline Support)
+// Network-first for local assets, cache-only fallback for offline
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Only handle same-origin requests with cache strategy
+  if (url.origin !== location.origin) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request);
-    })
+    fetch(event.request)
+      .then((response) => {
+        // Update cache with fresh response
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(() => {
+        // Offline fallback to cache
+        return caches.match(event.request);
+      })
   );
 });
 
@@ -43,32 +58,33 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  // Focus or open the app
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
       for (const client of clientList) {
         if ('focus' in client) {
           return client.focus();
         }
       }
-      // If no window is open, open a new one
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow(new URL('./', self.location).href);
       }
     })
   );
 });
 
-// Handle push notifications (for future server-side push support)
+// Handle push notifications
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
-  const data = event.data.json();
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    return;
+  }
+
   const options = {
     body: data.body || 'Event reminder',
-    icon: 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png',
-    badge: 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png',
     tag: data.tag || 'timetable-notification',
     requireInteraction: true,
   };
@@ -77,4 +93,3 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title || 'Timetable', options)
   );
 });
-

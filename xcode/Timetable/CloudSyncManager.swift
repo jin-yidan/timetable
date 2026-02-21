@@ -12,24 +12,40 @@ import WebKit
 class CloudSyncManager: NSObject, WKScriptMessageHandler {
     weak var webView: WKWebView?
 
-    private let container = CKContainer(identifier: "iCloud.com.jinyidan.Timetable")
-    private lazy var privateDB: CKDatabase = container.privateCloudDatabase
+    private lazy var container: CKContainer? = {
+        guard FileManager.default.ubiquityIdentityToken != nil else { return nil }
+        return CKContainer(identifier: "iCloud.com.jinyidan.Timetable")
+    }()
+    private lazy var privateDB: CKDatabase? = container?.privateCloudDatabase
     private let zoneID = CKRecordZone.ID(zoneName: "TimetableZone", ownerName: CKCurrentUserDefaultName)
     private let changeTokenKey = "cloudkit.serverChangeToken"
     private let zoneCreatedKey = "cloudkit.zoneCreated"
     private let subscriptionCreatedKey = "cloudkit.subscriptionCreated"
 
-    private var isFetchingChanges = false
+    private let fetchLock = NSLock()
+    private var _isFetchingChanges = false
+    private var isFetchingChanges: Bool {
+        get { fetchLock.lock(); defer { fetchLock.unlock() }; return _isFetchingChanges }
+        set { fetchLock.lock(); defer { fetchLock.unlock() }; _isFetchingChanges = newValue }
+    }
+    private var isAvailable: Bool { container != nil }
 
     override init() {
         super.init()
-        setupZoneAndSubscription()
+        if FileManager.default.ubiquityIdentityToken != nil {
+            setupZoneAndSubscription()
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(handleRemoteNotification), name: .cloudKitRemoteNotification, object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Zone & Subscription Setup
 
     private func setupZoneAndSubscription() {
+        guard isAvailable, let db = privateDB else { return }
         guard !UserDefaults.standard.bool(forKey: zoneCreatedKey) else {
             setupSubscription()
             return
@@ -46,10 +62,11 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
                 print("CloudSync: Failed to create zone: \(error)")
             }
         }
-        privateDB.add(operation)
+        db.add(operation)
     }
 
     private func setupSubscription() {
+        guard isAvailable, let db = privateDB else { return }
         guard !UserDefaults.standard.bool(forKey: subscriptionCreatedKey) else { return }
 
         let subscription = CKDatabaseSubscription(subscriptionID: "timetable-changes")
@@ -57,7 +74,7 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
         notificationInfo.shouldSendContentAvailable = true
         subscription.notificationInfo = notificationInfo
 
-        privateDB.save(subscription) { [weak self] _, error in
+        db.save(subscription) { [weak self] _, error in
             if let error = error {
                 // Already exists is OK
                 if (error as? CKError)?.code == .serverRejectedRequest { return }
@@ -177,10 +194,11 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
     }
 
     private func softDeleteRecord(type: String, id: String) {
+        guard isAvailable, let db = privateDB else { return }
         let prefix = type == "TimetableEvent" ? "event" : "goal"
         let recordID = CKRecord.ID(recordName: "\(prefix)-\(id)", zoneID: zoneID)
 
-        privateDB.fetch(withRecordID: recordID) { [weak self] record, error in
+        db.fetch(withRecordID: recordID) { [weak self] record, error in
             if let record = record {
                 record["deleted"] = 1 as CKRecordValue
                 record["modifiedAt"] = (Date().timeIntervalSince1970 * 1000) as CKRecordValue
@@ -204,7 +222,7 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
     // MARK: - Save Helper
 
     private func saveRecords(_ records: [CKRecord]) {
-        guard !records.isEmpty else { return }
+        guard isAvailable, let db = privateDB, !records.isEmpty else { return }
 
         let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
         operation.savePolicy = .changedKeys
@@ -218,7 +236,7 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
                 print("CloudSync: Save failed: \(error)")
             }
         }
-        privateDB.add(operation)
+        db.add(operation)
     }
 
     // MARK: - Fetch Changes
@@ -228,7 +246,7 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
     }
 
     func fetchChanges() {
-        guard !isFetchingChanges else { return }
+        guard isAvailable, let db = privateDB, !isFetchingChanges else { return }
         isFetchingChanges = true
 
         let token = loadChangeToken()
@@ -333,7 +351,7 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
             }
         }
 
-        privateDB.add(operation)
+        db.add(operation)
     }
 
     // MARK: - Send to JS
@@ -342,13 +360,19 @@ class CloudSyncManager: NSObject, WKScriptMessageHandler {
         guard let jsonData = try? JSONSerialization.data(withJSONObject: payload),
               let jsonString = String(data: jsonData, encoding: .utf8) else { return }
 
-        let escaped = jsonString
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
+        // Use JSON.parse with a properly escaped JSON string literal
+        // Encode the JSON string as a JS string literal by escaping backslash, quotes, and control chars
+        var escaped = jsonString
+        escaped = escaped.replacingOccurrences(of: "\\", with: "\\\\")
+        escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
+        escaped = escaped.replacingOccurrences(of: "\n", with: "\\n")
+        escaped = escaped.replacingOccurrences(of: "\r", with: "\\r")
+        escaped = escaped.replacingOccurrences(of: "\t", with: "\\t")
+
+        let js = "window.receiveCloudChanges(\"\(escaped)\")"
 
         DispatchQueue.main.async { [weak self] in
-            self?.webView?.evaluateJavaScript("window.receiveCloudChanges('\(escaped)')")
+            self?.webView?.evaluateJavaScript(js)
         }
     }
 

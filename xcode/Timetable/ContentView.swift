@@ -30,11 +30,12 @@ struct WebView: NSViewRepresentable {
         coordinator.calendarSyncManager.webView = webView
         coordinator.cloudSyncManager.webView = webView
 
+        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+
         return webView
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        nsView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
 }
 
@@ -101,30 +102,35 @@ struct WebView: UIViewRepresentable {
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 
         config.userContentController.add(coordinator.calendarSyncManager, name: "calendarSync")
-        config.userContentController.add(coordinator.cloudSyncManager, name: "cloudSync")
+        if FileManager.default.ubiquityIdentityToken != nil {
+            config.userContentController.add(coordinator.cloudSyncManager, name: "cloudSync")
+        }
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
 
         coordinator.calendarSyncManager.webView = webView
         coordinator.cloudSyncManager.webView = webView
+
+        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
 
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        uiView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
 }
 
 struct ContentView: View {
-    let localPath: URL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "WebResources")!
-
     var body: some View {
-        WebView(url: localPath)
-            .ignoresSafeArea()
+        if let localPath = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "WebResources") {
+            WebView(url: localPath)
+                .ignoresSafeArea()
+        } else {
+            Text("Failed to load app resources")
+        }
     }
 }
 

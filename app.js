@@ -555,7 +555,13 @@ function renderTasks() {
     for (const item of items) {
       const itemEl = document.createElement("div");
       itemEl.className = "task-item";
-      itemEl.innerHTML = `<span class="task-bullet"></span><span>${item.title}</span>`;
+      itemEl.innerHTML = `<span class="task-time">${item.time}</span><span class="task-title">${item.title}</span>`;
+      itemEl.addEventListener("click", () => {
+        selectedDate = date;
+        els.dateInput.value = selectedDate;
+        localStorage.setItem(SELECTED_DATE_KEY, selectedDate);
+        switchView("timeline");
+      });
       itemsEl.appendChild(itemEl);
     }
     groupEl.appendChild(itemsEl);
@@ -1404,12 +1410,17 @@ function parseNaturalLanguageData(text) {
       };
       const month = months[monthMatch[1].toLowerCase()];
       const day = parseInt(monthMatch[2]);
-      const year = todayDate.getFullYear();
-      const targetDate = new Date(year, month, day);
-      if (targetDate < todayDate) targetDate.setFullYear(year + 1);
-      result.date = localDateKey(targetDate);
-      result.hasAny = true;
-      result.cleanTitle = result.cleanTitle.replace(monthMatch[0], "").trim();
+      if (day >= 1 && day <= 31) {
+        const year = todayDate.getFullYear();
+        const targetDate = new Date(year, month, day);
+        // Validate the date didn't overflow (e.g. Feb 30 → Mar 2)
+        if (targetDate.getMonth() === month) {
+          if (targetDate < todayDate) targetDate.setFullYear(year + 1);
+          result.date = localDateKey(targetDate);
+          result.hasAny = true;
+          result.cleanTitle = result.cleanTitle.replace(monthMatch[0], "").trim();
+        }
+      }
     }
   }
 
